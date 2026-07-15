@@ -409,11 +409,8 @@ async function loadAll() {
   renderShell();
   document.getElementById("stamp").textContent = "";
   const all = SECTIONS.flatMap((s) => s.sdks);
-  const withPins = all.filter((s) => s.pins);
-  const plain = all.filter((s) => !s.pins);
-  await Promise.all(plain.map(loadSdk));
-  await Promise.all(withPins.map(loadSdk));
-  withPins.forEach(renderPins);
+  await Promise.all(all.map(loadSdk));
+  all.filter((s) => s.pins).forEach(renderPins);
   document.getElementById("stamp").textContent =
     "Last checked " + new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
