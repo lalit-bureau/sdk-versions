@@ -1,0 +1,69 @@
+# Hourly snapshot of Android SDK versions from packages.bureau.id.
+#
+# Browsers cannot read that server directly (no CORS headers), so index.html
+# falls back to the versions-android.json this workflow commits. Commits happen
+# only when a version actually changes, plus a keep-alive refresh so GitHub does
+# not disable the schedule after 60 days without repository activity.
+#
+# To track another artifact, add its maven path to the ARTIFACTS line.
+
+name: Update Android versions snapshot
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-maven-snapshot
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch latest versions from Bureau Maven
+        run: |
+          set -euo pipefail
+          ARTIFACTS="id/bureau/otl id/bureau/livenesscheck"
+          BASE="https://packages.bureau.id/api/packages/Bureau/maven"
+          entries='{}'
+          for a in $ARTIFACTS; do
+            xml=$(curl -fsS --max-time 60 "$BASE/$a/maven-metadata.xml")
+            v=$(echo "$xml" | grep -oE '<latest>[^<]+</latest>' | sed -E 's|</?latest>||g' || true)
+            if [ -z "$v" ]; then
+              v=$(echo "$xml" | grep -oE '<release>[^<]+</release>' | sed -E 's|</?release>||g')
+            fi
+            name=$(basename "$a")
+            lm=$(curl -fsSI --max-time 60 "$BASE/$a/$v/$name-$v.pom" | grep -i '^last-modified:' | sed -E 's/^[Ll]ast-[Mm]odified:[[:space:]]*//' | tr -d '\r' || true)
+            entries=$(echo "$entries" | jq --arg k "$a" --arg v "$v" --arg d "$lm" '. + {($k): {version: $v, date: $d}}')
+          done
+          jq -n --argjson artifacts "$entries" --arg t "$(date -u +%FT%TZ)" \
+            '{checked_at: $t, artifacts: $artifacts}' > versions-android.json.new
+          cat versions-android.json.new
+
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          if [ -f versions-android.json ] \
+            && cmp -s <(jq -S .artifacts versions-android.json) <(jq -S .artifacts versions-android.json.new); then
+            last=$(git log -1 --format=%ct -- versions-android.json)
+            age_days=$(( ( $(date +%s) - last ) / 86400 ))
+            if [ "$age_days" -lt 50 ]; then
+              echo "No version change (snapshot ${age_days}d old); skipping commit."
+              rm versions-android.json.new
+              exit 0
+            fi
+            echo "Keep-alive refresh (snapshot ${age_days}d old)."
+          fi
+          mv versions-android.json.new versions-android.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add versions-android.json
+          git commit -m "Update Android versions snapshot"
+          git push

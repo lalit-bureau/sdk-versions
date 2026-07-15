@@ -260,28 +260,40 @@ function npmPackage(pkg) {
 
 function bureauMaven(artifactPath) {
   const metaUrl = `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/maven-metadata.xml`;
+  const parts = artifactPath.split("/");
+  const artifact = parts.pop();
+  const uiUrl = `https://packages.bureau.id/Bureau/-/packages/maven/${parts.join(".")}-${artifact}/versions`;
   return async () => {
-    let r;
     try {
-      r = await fetch(metaUrl);
-    } catch (e) {
-      throw new Error("cannot be read from the browser; use the Source link below to view versions");
+      const r = await fetch(metaUrl);
+      if (!r.ok) throw new Error(`maven ${r.status}`);
+      const xml = await r.text();
+      const m = xml.match(/<latest>([^<]+)<\/latest>/) || xml.match(/<release>([^<]+)<\/release>/);
+      if (!m) throw new Error("could not parse maven-metadata.xml");
+      const version = m[1];
+      let date = null;
+      try {
+        const pom = await fetch(
+          `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/${version}/${artifact}-${version}.pom`,
+          { method: "HEAD" }
+        );
+        date = pom.headers.get("Last-Modified");
+      } catch (e) {}
+      return { version, date, url: uiUrl };
+    } catch (liveError) {
+      // Browsers cannot read packages.bureau.id (no CORS headers); fall back to
+      // the snapshot a scheduled workflow commits next to this page.
+      try {
+        const r = await fetch("versions-android.json", { cache: "no-store" });
+        if (!r.ok) throw 0;
+        const j = await r.json();
+        const entry = j.artifacts && j.artifacts[artifactPath];
+        if (!entry || !entry.version) throw 0;
+        return { version: entry.version, date: entry.date || null, url: uiUrl };
+      } catch (e) {
+        throw new Error("cannot be read from the browser; use the Source link below to view versions");
+      }
     }
-    if (!r.ok) throw new Error(`maven ${r.status}`);
-    const xml = await r.text();
-    const m = xml.match(/<latest>([^<]+)<\/latest>/) || xml.match(/<release>([^<]+)<\/release>/);
-    if (!m) throw new Error("could not parse maven-metadata.xml");
-    const version = m[1];
-    const artifact = artifactPath.split("/").pop();
-    let date = null;
-    try {
-      const pom = await fetch(
-        `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/${version}/${artifact}-${version}.pom`,
-        { method: "HEAD" }
-      );
-      date = pom.headers.get("Last-Modified");
-    } catch (e) {}
-    return { version, date, url: metaUrl };
   };
 }
 
