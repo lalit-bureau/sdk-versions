@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bureau SDK Versions</title>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-FHHZSB60T4"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  gtag("js", new Date());
+  gtag("config", "G-FHHZSB60T4");
+</script>
 <style>
   :root {
     --bg: #f6f7f9;
@@ -133,6 +140,12 @@
 
 <script>
 "use strict";
+
+function track(name, params) {
+  try {
+    if (typeof gtag === "function") gtag("event", name, params);
+  } catch (e) {}
+}
 
 /* ---- configuration: add or remove SDKs here ---- */
 const SECTIONS = [
@@ -289,7 +302,14 @@ function bureauMaven(artifactPath) {
         const j = await r.json();
         const entry = j.artifacts && j.artifacts[artifactPath];
         if (!entry || !entry.version) throw 0;
-        return { version: entry.version, date: entry.date || null, url: uiUrl };
+        let note = null;
+        const checked = j.checked_at ? new Date(j.checked_at).getTime() : NaN;
+        const ageHours = (Date.now() - checked) / 3600000;
+        if (isFinite(ageHours) && ageHours > 6) {
+          note = `last verified ${Math.round(ageHours)} hours ago`;
+          track("snapshot_stale", { artifact: artifactPath, age_hours: Math.round(ageHours) });
+        }
+        return { version: entry.version, date: entry.date || null, url: uiUrl, note };
       } catch (e) {
         throw new Error("cannot be read from the browser; use the Source link below to view versions");
       }
@@ -418,7 +438,8 @@ function renderCard(sdk) {
       ? `<a href="${esc(res.url)}" target="_blank" rel="noopener">${esc(res.version)}</a>`
       : esc(res.version)) + copyBtn(res.version);
   const ago = daysAgo(res.date);
-  dateEl.textContent = res.date ? `Released ${fmtDate(res.date)} (${ago})` : "";
+  const released = res.date ? `Released ${fmtDate(res.date)} (${ago})` : "";
+  dateEl.textContent = [released, res.note].filter(Boolean).join(" · ");
 }
 
 function pinChip(pin, latest) {
@@ -457,6 +478,7 @@ async function loadSdk(sdk) {
   } catch (e) {
     results[sdk.id] = { error: e.message || String(e) };
     renderCard(sdk);
+    track("card_error", { sdk: sdk.id, message: (e.message || String(e)).slice(0, 100) });
   }
   return sdk;
 }
