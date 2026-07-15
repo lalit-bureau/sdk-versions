@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bureau SDK Versions</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #1a1d21;
+    --muted: #6b7280;
+    --border: #e3e6ea;
+    --accent: #2f5af5;
+    --ok-bg: #e7f6ec;
+    --ok-fg: #177245;
+    --warn-bg: #fdf1e2;
+    --warn-fg: #a05a00;
+    --err-bg: #fdeaea;
+    --err-fg: #a02020;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --card: #1d2025;
+      --text: #e8eaed;
+      --muted: #9aa2ad;
+      --border: #2c3037;
+      --accent: #7a97ff;
+      --ok-bg: #16321f;
+      --ok-fg: #6fd398;
+      --warn-bg: #37280f;
+      --warn-fg: #e8b56b;
+      --err-bg: #3a1c1c;
+      --err-fg: #e88;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  h1 { font-size: 22px; margin: 0; }
+  .stamp { color: var(--muted); font-size: 13px; }
+  .note { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 28px 0 12px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card .platform { font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+  .card .name { font-weight: 600; font-size: 15px; }
+  .card .version {
+    font-size: 30px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin: 10px 0 2px;
+    min-height: 38px;
+  }
+  .card .version a { color: inherit; text-decoration: none; }
+  .card .version a:hover { text-decoration: underline; }
+  .card .date { font-size: 13px; color: var(--muted); }
+  .card .src { font-size: 12px; margin-top: 10px; }
+  .card .src a { color: var(--accent); text-decoration: none; }
+  .card .src a:hover { text-decoration: underline; }
+  .pins { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .pins .pins-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .pin-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .pin-row .pin-ver { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .chip {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-left: 8px;
+    vertical-align: 1px;
+  }
+  .chip.ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .chip.err { background: var(--err-bg); color: var(--err-fg); }
+  button.copy {
+    background: none;
+    border: none;
+    padding: 2px;
+    margin-left: 6px;
+    cursor: pointer;
+    color: var(--muted);
+    border-radius: 4px;
+    vertical-align: 1px;
+    line-height: 0;
+  }
+  button.copy:hover { color: var(--accent); }
+  button.copy.copied { color: var(--ok-fg); }
+  .error-msg { font-size: 13px; color: var(--err-fg); }
+  .skeleton { color: var(--muted); font-size: 16px; }
+  button.refresh {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button.refresh:hover { border-color: var(--accent); color: var(--accent); }
+  footer { margin-top: 40px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bureau SDK Versions</h1>
+    <div>
+      <span class="stamp" id="stamp"></span>
+      <button class="refresh" onclick="loadAll()">Refresh</button>
+    </div>
+  </header>
+  <p class="note">Latest available SDK versions, fetched live from the public release sources each time this page loads.</p>
+  <div id="sections"></div>
+  <footer>
+    Sources: GitHub Releases, npm registry, Bureau Maven. React Native bundled versions are read from the published npm package.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ---- configuration: add or remove SDKs here ---- */
+const SECTIONS = [
+  {
+    title: "One Tap Login / Silent Mobile Verification",
+    sdks: [
+      {
+        id: "otl-ios",
+        platform: "iOS",
+        name: "BureauSMV",
+        fetcher: githubLatestRelease("Bureau-Inc/BureauSMV"),
+        sourceLabel: "GitHub Releases",
+        sourceUrl: "https://github.com/Bureau-Inc/BureauSMV/releases",
+      },
+      {
+        id: "otl-android",
+        platform: "Android",
+        name: "id.bureau:otl",
+        fetcher: bureauMaven("id/bureau/otl"),
+        sourceLabel: "packages.bureau.id (Maven)",
+        sourceUrl: "https://packages.bureau.id/Bureau/-/packages/maven/id.bureau-otl",
+      },
+      {
+        id: "otl-rn",
+        platform: "React Native",
+        name: "react-native-bureauid-fraud-sdk",
+        fetcher: npmPackage("react-native-bureauid-fraud-sdk"),
+        sourceLabel: "npm registry",
+        sourceUrl: "https://www.npmjs.com/package/react-native-bureauid-fraud-sdk",
+        pins: [
+          {
+            label: "iOS BureauSMV",
+            file: "sample-native-module.podspec",
+            regex: /s\.dependency\s+["']BureauSMV["']\s*,\s*["']([^"']+)["']/,
+            latestFrom: "otl-ios",
+          },
+          {
+            label: "Android id.bureau:otl",
+            file: "android/build.gradle",
+            regex: /id\.bureau:otl:([^"']+)["']/,
+            latestFrom: "otl-android",
+          },
+        ],
+      },
+    ],
+  },
+];
+
+/* ---- fetchers: each returns { version, date, url } ---- */
+
+function githubLatestRelease(repo) {
+  return async () => {
+    const r = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (r.status === 403 || r.status === 429) throw new Error("GitHub API rate limit reached, retry in a few minutes");
+    if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+    const j = await r.json();
+    return {
+      version: (j.tag_name || "").replace(/^v/, ""),
+      date: j.published_at,
+      url: j.html_url,
+    };
+  };
+}
+
+function npmPackage(pkg) {
+  return async () => {
+    const r = await fetch(`https://registry.npmjs.org/${pkg}`);
+    if (!r.ok) throw new Error(`npm registry ${r.status}`);
+    const j = await r.json();
+    const v = j["dist-tags"] && j["dist-tags"].latest;
+    if (!v) throw new Error("no latest dist-tag");
+    return {
+      version: v,
+      date: j.time && j.time[v],
+      url: `https://www.npmjs.com/package/${pkg}/v/${v}`,
+    };
+  };
+}
+
+function bureauMaven(artifactPath) {
+  const metaUrl = `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/maven-metadata.xml`;
+  return async () => {
+    let r;
+    try {
+      r = await fetch(metaUrl);
+    } catch (e) {
+      throw new Error("cannot be read from the browser; use the Source link below to view versions");
+    }
+    if (!r.ok) throw new Error(`maven ${r.status}`);
+    const xml = await r.text();
+    const m = xml.match(/<latest>([^<]+)<\/latest>/) || xml.match(/<release>([^<]+)<\/release>/);
+    if (!m) throw new Error("could not parse maven-metadata.xml");
+    const version = m[1];
+    const artifact = artifactPath.split("/").pop();
+    let date = null;
+    try {
+      const pom = await fetch(
+        `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/${version}/${artifact}-${version}.pom`,
+        { method: "HEAD" }
+      );
+      date = pom.headers.get("Last-Modified");
+    } catch (e) {}
+    return { version, date, url: metaUrl };
+  };
+}
+
+async function fetchPins(pkg, version, pins) {
+  const base = `https://cdn.jsdelivr.net/npm/${pkg}@${version}`;
+  return Promise.all(
+    pins.map(async (p) => {
+      const r = await fetch(`${base}/${p.file}`).catch(() => null);
+      const text = r && r.ok ? await r.text() : "";
+      return { ...p, version: (text.match(p.regex) || [])[1] || null };
+    })
+  );
+}
+
+/* ---- rendering ---- */
+
+const results = {};
+
+const ICON_COPY =
+  '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/></svg>';
+const ICON_CHECK =
+  '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5 6.5 12 13 4.5"/></svg>';
+
+function copyBtn(text) {
+  return `<button class="copy" data-copy="${esc(text)}" title="Copy ${esc(text)}" aria-label="Copy ${esc(text)}">${ICON_COPY}</button>`;
+}
+
+function sectionCopyText(sec) {
+  const lines = sec.sdks.map((s) => {
+    const res = results[s.id] || {};
+    let line = `${s.platform} (${s.name}): ${res.version || "unavailable"}`;
+    if (res.pins) {
+      const pins = res.pins.filter((p) => p.version).map((p) => `${p.label} ${p.version}`).join(", ");
+      if (pins) line += ` [bundles ${pins}]`;
+    }
+    return line;
+  });
+  return [sec.title, ...lines].join("\n");
+}
+
+document.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button.copy");
+  if (!btn) return;
+  const text =
+    btn.dataset.section !== undefined ? sectionCopyText(SECTIONS[+btn.dataset.section]) : btn.dataset.copy;
+  const write = navigator.clipboard
+    ? navigator.clipboard.writeText(text)
+    : Promise.reject();
+  write.catch(() => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  });
+  btn.classList.add("copied");
+  btn.innerHTML = ICON_CHECK;
+  setTimeout(() => {
+    btn.classList.remove("copied");
+    btn.innerHTML = ICON_COPY;
+  }, 1200);
+});
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function daysAgo(iso) {
+  if (!iso) return null;
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days < 1) return "today";
+  if (days === 1) return "1 day ago";
+  if (days < 60) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 24) return `${months} months ago`;
+  return `${Math.floor(months / 12)} years ago`;
+}
+
+function renderShell() {
+  const root = document.getElementById("sections");
+  root.innerHTML = SECTIONS.map(
+    (sec, i) => `
+    <h2>${esc(sec.title)}<button class="copy" data-section="${i}" title="Copy all ${esc(sec.title)} versions" aria-label="Copy all ${esc(sec.title)} versions">${ICON_COPY}</button></h2>
+    <div class="grid">
+      ${sec.sdks
+        .map(
+          (s) => `
+        <div class="card" id="card-${s.id}">
+          <div class="platform">${esc(s.platform)}</div>
+          <div class="name">${esc(s.name)}</div>
+          <div class="version"><span class="skeleton">loading&hellip;</span></div>
+          <div class="date"></div>
+          ${s.pins ? '<div class="pins" hidden></div>' : ""}
+          <div class="src">Source: <a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener">${esc(s.sourceLabel)}</a></div>
+        </div>`
+        )
+        .join("")}
+    </div>`
+  ).join("");
+}
+
+function renderCard(sdk) {
+  const card = document.getElementById(`card-${sdk.id}`);
+  const res = results[sdk.id];
+  const verEl = card.querySelector(".version");
+  const dateEl = card.querySelector(".date");
+  if (res.error) {
+    verEl.innerHTML = '<span class="chip err">unavailable</span>';
+    dateEl.innerHTML = `<span class="error-msg">${esc(res.error)}</span>`;
+    return;
+  }
+  verEl.innerHTML =
+    (res.url
+      ? `<a href="${esc(res.url)}" target="_blank" rel="noopener">${esc(res.version)}</a>`
+      : esc(res.version)) + copyBtn(res.version);
+  const ago = daysAgo(res.date);
+  dateEl.textContent = res.date ? `Released ${fmtDate(res.date)} (${ago})` : "";
+}
+
+function pinChip(pin, latest) {
+  if (!pin || !latest) return "";
+  return pin === latest
+    ? '<span class="chip ok">latest</span>'
+    : `<span class="chip warn">latest is ${esc(latest)}</span>`;
+}
+
+function renderPins(sdk) {
+  const card = document.getElementById(`card-${sdk.id}`);
+  const el = card && card.querySelector(".pins");
+  const res = results[sdk.id];
+  if (!el || !res || !res.pins) return;
+  el.hidden = false;
+  el.innerHTML =
+    '<div class="pins-title">Bundled native SDKs</div>' +
+    res.pins
+      .map((p) => {
+        const latest = (results[p.latestFrom] || {}).version || null;
+        return `<div class="pin-row"><span>${esc(p.label)}</span>
+          <span class="pin-ver">${esc(p.version || "?")}${p.version ? copyBtn(p.version) : ""}${pinChip(p.version, latest)}</span></div>`;
+      })
+      .join("");
+}
+
+async function loadSdk(sdk) {
+  try {
+    const res = await sdk.fetcher();
+    results[sdk.id] = res;
+    renderCard(sdk);
+    if (sdk.pins && res.version) {
+      res.pins = await fetchPins(sdk.name, res.version, sdk.pins);
+      renderPins(sdk);
+    }
+  } catch (e) {
+    results[sdk.id] = { error: e.message || String(e) };
+    renderCard(sdk);
+  }
+  return sdk;
+}
+
+async function loadAll() {
+  renderShell();
+  document.getElementById("stamp").textContent = "";
+  const all = SECTIONS.flatMap((s) => s.sdks);
+  const withPins = all.filter((s) => s.pins);
+  const plain = all.filter((s) => !s.pins);
+  await Promise.all(plain.map(loadSdk));
+  await Promise.all(withPins.map(loadSdk));
+  withPins.forEach(renderPins);
+  document.getElementById("stamp").textContent =
+    "Last checked " + new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+loadAll();
+</script>
+</body>
+</html>
