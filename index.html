@@ -179,6 +179,50 @@ const SECTIONS = [
       },
     ],
   },
+  {
+    title: "FaceGuard",
+    sdks: [
+      {
+        id: "fg-ios",
+        platform: "iOS",
+        name: "Faceguard",
+        fetcher: githubLatestRelease("Bureau-Inc/faceguard-ios"),
+        sourceLabel: "GitHub Releases",
+        sourceUrl: "https://github.com/Bureau-Inc/faceguard-ios/releases",
+      },
+      {
+        id: "fg-android",
+        platform: "Android",
+        name: "id.bureau:livenesscheck",
+        fetcher: bureauMaven("id/bureau/livenesscheck"),
+        sourceLabel: "packages.bureau.id (Maven)",
+        sourceUrl: "https://packages.bureau.id/Bureau/-/packages/maven/id.bureau-livenesscheck",
+      },
+      {
+        id: "fg-rn",
+        platform: "React Native",
+        name: "react-native-face-guard-sdk",
+        fetcher: npmPackage("react-native-face-guard-sdk"),
+        sourceLabel: "npm registry",
+        sourceUrl: "https://www.npmjs.com/package/react-native-face-guard-sdk",
+        pins: [
+          {
+            label: "iOS Faceguard",
+            file: "react-native-face-guard-sdk.podspec",
+            regex: /s\.dependency\s+["']Faceguard["']\s*,\s*["']([^"']+)["']/,
+            latestFrom: "fg-ios",
+            missingText: "not pinned (latest on install)",
+          },
+          {
+            label: "Android id.bureau:livenesscheck",
+            file: "android/build.gradle",
+            regex: /id\.bureau:livenesscheck:([^"']+)["']/,
+            latestFrom: "fg-android",
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 /* ---- fetchers: each returns { version, date, url } ---- */
@@ -384,7 +428,7 @@ function renderPins(sdk) {
       .map((p) => {
         const latest = (results[p.latestFrom] || {}).version || null;
         return `<div class="pin-row"><span>${esc(p.label)}</span>
-          <span class="pin-ver">${esc(p.version || "?")}${p.version ? copyBtn(p.version) : ""}${pinChip(p.version, latest)}</span></div>`;
+          <span class="pin-ver">${esc(p.version || p.missingText || "?")}${p.version ? copyBtn(p.version) : ""}${pinChip(p.version, latest)}</span></div>`;
       })
       .join("");
 }
