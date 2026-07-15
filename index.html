@@ -128,7 +128,7 @@
     <h1>Bureau SDK Versions</h1>
     <div>
       <span class="stamp" id="stamp"></span>
-      <button class="refresh" onclick="loadAll()">Refresh</button>
+      <button class="refresh" onclick="track('refresh'); loadAll()">Refresh</button>
     </div>
   </header>
   <p class="note">Latest available SDK versions, fetched live from the public release sources each time this page loads.</p>
@@ -359,6 +359,12 @@ document.addEventListener("click", (ev) => {
   if (!btn) return;
   const text =
     btn.dataset.section !== undefined ? sectionCopyText(SECTIONS[+btn.dataset.section]) : btn.dataset.copy;
+  if (btn.dataset.section !== undefined) {
+    track("copy_section", { section: SECTIONS[+btn.dataset.section].title });
+  } else {
+    const card = btn.closest(".card");
+    track("copy_version", { sdk: card ? card.id.replace("card-", "") : "unknown", value: text });
+  }
   const write = navigator.clipboard
     ? navigator.clipboard.writeText(text)
     : Promise.reject();
