@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-07-28T12:14:57Z",
+  "checked_at": "2026-07-29T12:21:56Z",
   "artifacts": {
     "id/bureau/otl": {
-      "version": "5.0.10",
-      "date": "Tue, 28 Jul 2026 11:36:37 GMT"
+      "version": "5.0.11",
+      "date": "Wed, 29 Jul 2026 11:32:05 GMT"
     },
     "id/bureau/livenesscheck": {
       "version": "2.0.8",
