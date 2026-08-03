@@ -25,6 +25,8 @@
     --warn-fg: #a05a00;
     --err-bg: #fdeaea;
     --err-fg: #a02020;
+    --mis-bg: #efeafd;
+    --mis-fg: #6b3fd1;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -40,6 +42,8 @@
       --warn-fg: #e8b56b;
       --err-bg: #3a1c1c;
       --err-fg: #e88;
+      --mis-bg: #2a2140;
+      --mis-fg: #b79cff;
     }
   }
   * { box-sizing: border-box; }
@@ -99,6 +103,7 @@
   .chip.ok { background: var(--ok-bg); color: var(--ok-fg); }
   .chip.warn { background: var(--warn-bg); color: var(--warn-fg); }
   .chip.err { background: var(--err-bg); color: var(--err-fg); }
+  .chip.mismatch { background: var(--mis-bg); color: var(--mis-fg); }
   button.copy {
     background: none;
     border: none;
@@ -154,6 +159,20 @@ function track(name, params) {
 
 /* ---- configuration: add or remove SDKs here ---- */
 const SECTIONS = [
+  {
+    title: "Device Intelligence",
+    sdks: [
+      {
+        id: "di-ios",
+        platform: "iOS",
+        name: "bureau-id-fraud-sdk",
+        fetcher: githubLatestRelease("Bureau-Inc/bureau-id-fraud-sdk"),
+        sourceLabel: "GitHub Releases",
+        sourceUrl: "https://github.com/Bureau-Inc/bureau-id-fraud-sdk/releases",
+        pod: { name: "bureau-id-fraud-sdk", shard: "1_2_6" },
+      },
+    ],
+  },
   {
     title: "One Tap Login / Silent Mobile Verification",
     sdks: [
@@ -578,6 +597,15 @@ function pinChip(pin, latest) {
     : `<span class="chip warn">latest is ${esc(latest)}</span>`;
 }
 
+// Compare the CocoaPods version against the GitHub release shown on the card.
+// If they differ, flag a mismatch and name the newer version as the effective latest.
+function podChip(podVer, releaseVer) {
+  if (!podVer || !releaseVer) return "";
+  if (podVer === releaseVer) return '<span class="chip ok">in sync</span>';
+  const newest = semverCompare(podVer, releaseVer) > 0 ? podVer : releaseVer;
+  return `<span class="chip mismatch" title="CocoaPods ${esc(podVer)} vs GitHub release ${esc(releaseVer)} — newest is ${esc(newest)}">mismatch · newest ${esc(newest)}</span>`;
+}
+
 function renderPod(sdk) {
   const card = document.getElementById(`card-${sdk.id}`);
   const el = card && card.querySelector(".pod-block");
@@ -592,7 +620,7 @@ function renderPod(sdk) {
   el.innerHTML =
     '<div class="pins-title">CocoaPods</div>' +
     `<div class="pin-row"><span>pod '${esc(sdk.pod.name)}'</span>
-      <span class="pin-ver"><a href="${esc(podUrl)}" target="_blank" rel="noopener">${esc(res.pod)}</a>${copyBtn(res.pod)}${pinChip(res.pod, res.version)}</span></div>`;
+      <span class="pin-ver"><a href="${esc(podUrl)}" target="_blank" rel="noopener">${esc(res.pod)}</a>${copyBtn(res.pod)}${podChip(res.pod, res.version)}</span></div>`;
 }
 
 function renderPins(sdk) {
