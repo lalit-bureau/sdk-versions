@@ -25,8 +25,6 @@
     --warn-fg: #a05a00;
     --err-bg: #fdeaea;
     --err-fg: #a02020;
-    --mis-bg: #efeafd;
-    --mis-fg: #6b3fd1;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -42,8 +40,6 @@
       --warn-fg: #e8b56b;
       --err-bg: #3a1c1c;
       --err-fg: #e88;
-      --mis-bg: #2a2140;
-      --mis-fg: #b79cff;
     }
   }
   * { box-sizing: border-box; }
@@ -89,6 +85,10 @@
   .pins .pins-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .pin-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 3px 0; }
   .pin-row .pin-ver { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pod-name { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .pod-value { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pod-value a { color: inherit; text-decoration: none; }
+  .pod-value a:hover { text-decoration: underline; }
   .pin-row .pin-ver a { color: inherit; text-decoration: none; }
   .pin-row .pin-ver a:hover { text-decoration: underline; }
   .chip {
@@ -99,11 +99,11 @@
     padding: 2px 8px;
     margin-left: 8px;
     vertical-align: 1px;
+    white-space: nowrap;
   }
   .chip.ok { background: var(--ok-bg); color: var(--ok-fg); }
   .chip.warn { background: var(--warn-bg); color: var(--warn-fg); }
   .chip.err { background: var(--err-bg); color: var(--err-fg); }
-  .chip.mismatch { background: var(--mis-bg); color: var(--mis-fg); }
   button.copy {
     background: none;
     border: none;
@@ -603,7 +603,7 @@ function podChip(podVer, releaseVer) {
   if (!podVer || !releaseVer) return "";
   if (podVer === releaseVer) return '<span class="chip ok">in sync</span>';
   const newest = semverCompare(podVer, releaseVer) > 0 ? podVer : releaseVer;
-  return `<span class="chip mismatch" title="CocoaPods ${esc(podVer)} vs GitHub release ${esc(releaseVer)} — newest is ${esc(newest)}">mismatch · newest ${esc(newest)}</span>`;
+  return `<span class="chip warn" title="CocoaPods ${esc(podVer)} vs GitHub release ${esc(releaseVer)} — newest is ${esc(newest)}">mismatch · newest ${esc(newest)}</span>`;
 }
 
 function renderPod(sdk) {
@@ -619,8 +619,8 @@ function renderPod(sdk) {
   const podUrl = `https://cocoapods.org/pods/${encodeURIComponent(sdk.pod.name)}`;
   el.innerHTML =
     '<div class="pins-title">CocoaPods</div>' +
-    `<div class="pin-row"><span>pod '${esc(sdk.pod.name)}'</span>
-      <span class="pin-ver"><a href="${esc(podUrl)}" target="_blank" rel="noopener">${esc(res.pod)}</a>${copyBtn(res.pod)}${podChip(res.pod, res.version)}</span></div>`;
+    `<span class="pod-name">pod '${esc(sdk.pod.name)}'</span>` +
+    `<div class="pod-value"><a href="${esc(podUrl)}" target="_blank" rel="noopener">${esc(res.pod)}</a>${copyBtn(res.pod)}${podChip(res.pod, res.version)}</div>`;
 }
 
 function renderPins(sdk) {
