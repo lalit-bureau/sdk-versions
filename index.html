@@ -82,6 +82,8 @@
   .pins .pins-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .pin-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 3px 0; }
   .pin-row .pin-ver { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pin-row .pin-ver a { color: inherit; text-decoration: none; }
+  .pin-row .pin-ver a:hover { text-decoration: underline; }
   .chip {
     display: inline-block;
     font-size: 11px;
@@ -134,7 +136,7 @@
   <p class="note">Latest available SDK versions, fetched live from the public release sources each time this page loads.</p>
   <div id="sections"></div>
   <footer>
-    Sources: GitHub Releases, npm registry, Bureau Maven. React Native bundled versions are read from the published npm package.
+    Sources: GitHub Releases, npm registry, Bureau Maven, CocoaPods CDN, pub.dev. React Native and Flutter bundled native versions are read from the published packages.
   </footer>
 </div>
 
@@ -159,6 +161,8 @@ const SECTIONS = [
         fetcher: githubLatestRelease("Bureau-Inc/BureauSMV"),
         sourceLabel: "GitHub Releases",
         sourceUrl: "https://github.com/Bureau-Inc/BureauSMV/releases",
+        // shard = first 3 hex chars of md5(pod name), used by the CocoaPods CDN
+        pod: { name: "BureauSMV", shard: "f_0_f" },
       },
       {
         id: "otl-android",
@@ -190,6 +194,30 @@ const SECTIONS = [
           },
         ],
       },
+      {
+        id: "otl-flutter",
+        platform: "Flutter",
+        name: "onetaplogin",
+        fetcher: pubPackage("onetaplogin"),
+        sourceLabel: "pub.dev",
+        sourceUrl: "https://pub.dev/packages/onetaplogin",
+        pinsSource: "pub",
+        pins: [
+          {
+            label: "iOS BureauSMV",
+            file: "ios/onetaplogin.podspec",
+            regex: /s\.dependency\s+["']BureauSMV["']\s*,\s*["']([^"']+)["']/,
+            latestFrom: "otl-ios",
+            missingText: "not pinned (latest on install)",
+          },
+          {
+            label: "Android id.bureau:otl",
+            file: "android/build.gradle",
+            regex: /id\.bureau:otl:([^"']+)["']/,
+            latestFrom: "otl-android",
+          },
+        ],
+      },
     ],
   },
   {
@@ -202,6 +230,7 @@ const SECTIONS = [
         fetcher: githubLatestRelease("Bureau-Inc/faceguard-ios"),
         sourceLabel: "GitHub Releases",
         sourceUrl: "https://github.com/Bureau-Inc/faceguard-ios/releases",
+        pod: { name: "Faceguard", shard: "a_c_a" },
       },
       {
         id: "fg-android",
@@ -271,6 +300,22 @@ function npmPackage(pkg) {
   };
 }
 
+function pubPackage(pkg) {
+  return async () => {
+    const r = await fetch(`https://pub.dev/api/packages/${pkg}`);
+    if (!r.ok) throw new Error(`pub.dev ${r.status}`);
+    const j = await r.json();
+    const l = j.latest;
+    if (!l || !l.version) throw new Error("no latest version");
+    return {
+      version: l.version,
+      date: l.published,
+      url: `https://pub.dev/packages/${pkg}/versions/${l.version}`,
+      archiveUrl: l.archive_url,
+    };
+  };
+}
+
 function bureauMaven(artifactPath) {
   const metaUrl = `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/maven-metadata.xml`;
   const parts = artifactPath.split("/");
@@ -317,6 +362,32 @@ function bureauMaven(artifactPath) {
   };
 }
 
+function semverCompare(a, b) {
+  const pa = String(a).split(/[.\-+]/);
+  const pb = String(b).split(/[.\-+]/);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = parseInt(pa[i], 10);
+    const nb = parseInt(pb[i], 10);
+    const va = isNaN(na) ? -1 : na;
+    const vb = isNaN(nb) ? -1 : nb;
+    if (va !== vb) return va - vb;
+  }
+  return 0;
+}
+
+async function fetchPodVersion(pod) {
+  // The CocoaPods CDN allows CORS; pods are indexed in shard files named
+  // by the first three hex chars of md5(pod name).
+  const r = await fetch(`https://cdn.cocoapods.org/all_pods_versions_${pod.shard}.txt`);
+  if (!r.ok) throw new Error(`CocoaPods CDN ${r.status}`);
+  const text = await r.text();
+  const line = text.split("\n").find((l) => l.startsWith(pod.name + "/"));
+  if (!line) throw new Error(`pod '${pod.name}' not found in CDN index`);
+  const versions = line.trim().split("/").slice(1);
+  if (!versions.length) throw new Error(`no versions listed for pod '${pod.name}'`);
+  return versions.sort(semverCompare).pop();
+}
+
 async function fetchPins(pkg, version, pins) {
   const base = `https://cdn.jsdelivr.net/npm/${pkg}@${version}`;
   return Promise.all(
@@ -326,6 +397,46 @@ async function fetchPins(pkg, version, pins) {
       return { ...p, version: (text.match(p.regex) || [])[1] || null };
     })
   );
+}
+
+// Minimal tar reader: returns a { path: text } map of regular file entries.
+function parseTar(buf) {
+  const files = {};
+  const dec = new TextDecoder();
+  let off = 0;
+  while (off + 512 <= buf.length) {
+    const name = dec.decode(buf.subarray(off, off + 100)).replace(/\0.*$/, "");
+    if (!name) break; // zero block marks end of archive
+    const sizeStr = dec.decode(buf.subarray(off + 124, off + 136)).replace(/\0.*$/, "").trim();
+    const size = parseInt(sizeStr, 8) || 0;
+    const typeflag = String.fromCharCode(buf[off + 156]);
+    const dataStart = off + 512;
+    if (typeflag === "0" || typeflag === "\0" || typeflag === "") {
+      files[name.replace(/^\.\//, "")] = dec.decode(buf.subarray(dataStart, dataStart + size));
+    }
+    off = dataStart + Math.ceil(size / 512) * 512;
+  }
+  return files;
+}
+
+// Read native pins from a Dart/Flutter package archive on pub.dev. The gzipped
+// tarball is decompressed in the browser, then the pinned files are matched.
+async function fetchPubPins(archiveUrl, pins) {
+  let files = {};
+  try {
+    if (!archiveUrl) throw new Error("no archive url");
+    const r = await fetch(archiveUrl);
+    if (!r.ok) throw new Error(`pub archive ${r.status}`);
+    const stream = r.body.pipeThrough(new DecompressionStream("gzip"));
+    const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+    files = parseTar(buf);
+  } catch (e) {
+    // leave files empty; every pin resolves to its missing state
+  }
+  return pins.map((p) => {
+    const text = files[p.file] || "";
+    return { ...p, version: (text.match(p.regex) || [])[1] || null };
+  });
 }
 
 /* ---- rendering ---- */
@@ -345,6 +456,7 @@ function sectionCopyText(sec) {
   const lines = sec.sdks.map((s) => {
     const res = results[s.id] || {};
     let line = `${s.platform} (${s.name}): ${res.version || "unavailable"}`;
+    if (res.pod) line += ` [CocoaPods ${res.pod}]`;
     if (res.pins) {
       const pins = res.pins.filter((p) => p.version).map((p) => `${p.label} ${p.version}`).join(", ");
       if (pins) line += ` [bundles ${pins}]`;
@@ -420,6 +532,7 @@ function renderShell() {
           <div class="name">${esc(s.name)}</div>
           <div class="version"><span class="skeleton">loading&hellip;</span></div>
           <div class="date"></div>
+          ${s.pod ? '<div class="pins pod-block" hidden></div>' : ""}
           ${s.pins ? '<div class="pins" hidden></div>' : ""}
           <div class="src">Source: <a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener">${esc(s.sourceLabel)}</a></div>
         </div>`
@@ -455,6 +568,23 @@ function pinChip(pin, latest) {
     : `<span class="chip warn">latest is ${esc(latest)}</span>`;
 }
 
+function renderPod(sdk) {
+  const card = document.getElementById(`card-${sdk.id}`);
+  const el = card && card.querySelector(".pod-block");
+  const res = results[sdk.id];
+  if (!el || !res) return;
+  el.hidden = false;
+  if (res.podError) {
+    el.innerHTML = `<div class="pins-title">CocoaPods</div><div class="error-msg">${esc(res.podError)}</div>`;
+    return;
+  }
+  const podUrl = `https://cocoapods.org/pods/${encodeURIComponent(sdk.pod.name)}`;
+  el.innerHTML =
+    '<div class="pins-title">CocoaPods</div>' +
+    `<div class="pin-row"><span>pod '${esc(sdk.pod.name)}'</span>
+      <span class="pin-ver"><a href="${esc(podUrl)}" target="_blank" rel="noopener">${esc(res.pod)}</a>${copyBtn(res.pod)}${pinChip(res.pod, res.version)}</span></div>`;
+}
+
 function renderPins(sdk) {
   const card = document.getElementById(`card-${sdk.id}`);
   const el = card && card.querySelector(".pins");
@@ -473,18 +603,33 @@ function renderPins(sdk) {
 }
 
 async function loadSdk(sdk) {
+  const podPromise = sdk.pod
+    ? fetchPodVersion(sdk.pod).then(
+        (v) => ({ pod: v }),
+        (e) => ({ podError: e.message || String(e) })
+      )
+    : null;
   try {
     const res = await sdk.fetcher();
     results[sdk.id] = res;
     renderCard(sdk);
     if (sdk.pins && res.version) {
-      res.pins = await fetchPins(sdk.name, res.version, sdk.pins);
+      res.pins = sdk.pinsSource === "pub"
+        ? await fetchPubPins(res.archiveUrl, sdk.pins)
+        : await fetchPins(sdk.name, res.version, sdk.pins);
       renderPins(sdk);
     }
   } catch (e) {
     results[sdk.id] = { error: e.message || String(e) };
     renderCard(sdk);
     track("card_error", { sdk: sdk.id, message: (e.message || String(e)).slice(0, 100) });
+  }
+  if (podPromise) {
+    Object.assign(results[sdk.id], await podPromise);
+    renderPod(sdk);
+    if (results[sdk.id].podError) {
+      track("card_error", { sdk: `${sdk.id}-pod`, message: results[sdk.id].podError.slice(0, 100) });
+    }
   }
   return sdk;
 }
