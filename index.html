@@ -512,8 +512,15 @@ function fmtDate(iso) {
 
 function daysAgo(iso) {
   if (!iso) return null;
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (days < 1) return "today";
+  const then = new Date(iso);
+  if (isNaN(then)) return null;
+  const now = new Date();
+  // Compare calendar dates in local time so the label flips at midnight,
+  // not 24 hours after the release moment.
+  const startThen = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  const startNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((startNow - startThen) / 86400000);
+  if (days <= 0) return "today";
   if (days === 1) return "1 day ago";
   if (days < 60) return `${days} days ago`;
   const months = Math.floor(days / 30);
