@@ -75,8 +75,8 @@
     margin: 10px 0 2px;
     min-height: 38px;
   }
-  .card .version a { color: inherit; text-decoration: none; }
-  .card .version a:hover { text-decoration: underline; }
+  .card .version a, .pod-value a, .pin-row .pin-ver a { color: inherit; text-decoration: none; }
+  .card .version a:hover, .pod-value a:hover, .pin-row .pin-ver a:hover { text-decoration: underline; }
   .card .date { font-size: 13px; color: var(--muted); }
   .card .src { font-size: 12px; margin-top: 10px; }
   .card .src a { color: var(--accent); text-decoration: none; }
@@ -87,10 +87,6 @@
   .pin-row .pin-ver { font-variant-numeric: tabular-nums; font-weight: 600; }
   .pod-name { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
   .pod-value { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .pod-value a { color: inherit; text-decoration: none; }
-  .pod-value a:hover { text-decoration: underline; }
-  .pin-row .pin-ver a { color: inherit; text-decoration: none; }
-  .pin-row .pin-ver a:hover { text-decoration: underline; }
   .chip {
     display: inline-block;
     font-size: 11px;
@@ -158,6 +154,8 @@ function track(name, params) {
 }
 
 /* ---- configuration: add or remove SDKs here ---- */
+const NOT_PINNED = { missingText: "not pinned (latest on install)" };
+
 const SECTIONS = [
   {
     title: "Device Intelligence",
@@ -167,8 +165,6 @@ const SECTIONS = [
         platform: "iOS",
         name: "bureau-id-fraud-sdk",
         fetcher: githubLatestRelease("Bureau-Inc/bureau-id-fraud-sdk"),
-        sourceLabel: "GitHub Releases",
-        sourceUrl: "https://github.com/Bureau-Inc/bureau-id-fraud-sdk/releases",
         pod: { name: "bureau-id-fraud-sdk", shard: "1_2_6" },
       },
       {
@@ -176,29 +172,15 @@ const SECTIONS = [
         platform: "Android",
         name: "id.bureau:device-intelligence",
         fetcher: bureauMaven("id/bureau/device-intelligence"),
-        sourceLabel: "packages.bureau.id (Maven)",
-        sourceUrl: "https://packages.bureau.id/Bureau/-/packages/maven/id.bureau-device-intelligence",
       },
       {
         id: "di-rn",
         platform: "React Native",
         name: "bureau-device-intelligence",
         fetcher: npmPackage("bureau-device-intelligence"),
-        sourceLabel: "npm registry",
-        sourceUrl: "https://www.npmjs.com/package/bureau-device-intelligence",
         pins: [
-          {
-            label: "iOS bureau-id-fraud-sdk",
-            file: "bureau-device-intelligence.podspec",
-            regex: /s\.dependency\s+["']bureau-id-fraud-sdk["']\s*,\s*["']([^"']+)["']/,
-            latestFrom: "di-ios",
-          },
-          {
-            label: "Android id.bureau:device-intelligence",
-            file: "android/build.gradle",
-            regex: /id\.bureau:device-intelligence:([^"']+)["']/,
-            latestFrom: "di-android",
-          },
+          iosDep("bureau-id-fraud-sdk", "di-ios", "bureau-device-intelligence.podspec"),
+          androidDep("id.bureau:device-intelligence", "di-android"),
         ],
       },
       {
@@ -206,22 +188,10 @@ const SECTIONS = [
         platform: "Flutter",
         name: "flutter_bureau_device_intelligence",
         fetcher: pubPackage("flutter_bureau_device_intelligence"),
-        sourceLabel: "pub.dev",
-        sourceUrl: "https://pub.dev/packages/flutter_bureau_device_intelligence",
         pinsSource: "pub",
         pins: [
-          {
-            label: "iOS bureau-id-fraud-sdk",
-            file: "ios/flutter_bureau_device_intelligence.podspec",
-            regex: /s\.dependency\s+["']bureau-id-fraud-sdk["']\s*,\s*["']([^"']+)["']/,
-            latestFrom: "di-ios",
-          },
-          {
-            label: "Android id.bureau:device-intelligence",
-            file: "android/build.gradle",
-            regex: /id\.bureau:device-intelligence:([^"']+)["']/,
-            latestFrom: "di-android",
-          },
+          iosDep("bureau-id-fraud-sdk", "di-ios", "ios/flutter_bureau_device_intelligence.podspec"),
+          androidDep("id.bureau:device-intelligence", "di-android"),
         ],
       },
     ],
@@ -234,9 +204,6 @@ const SECTIONS = [
         platform: "iOS",
         name: "BureauSMV",
         fetcher: githubLatestRelease("Bureau-Inc/BureauSMV"),
-        sourceLabel: "GitHub Releases",
-        sourceUrl: "https://github.com/Bureau-Inc/BureauSMV/releases",
-        // shard = first 3 hex chars of md5(pod name), used by the CocoaPods CDN
         pod: { name: "BureauSMV", shard: "f_0_f" },
       },
       {
@@ -244,29 +211,15 @@ const SECTIONS = [
         platform: "Android",
         name: "id.bureau:otl",
         fetcher: bureauMaven("id/bureau/otl"),
-        sourceLabel: "packages.bureau.id (Maven)",
-        sourceUrl: "https://packages.bureau.id/Bureau/-/packages/maven/id.bureau-otl",
       },
       {
         id: "otl-rn",
         platform: "React Native",
         name: "react-native-bureauid-fraud-sdk",
         fetcher: npmPackage("react-native-bureauid-fraud-sdk"),
-        sourceLabel: "npm registry",
-        sourceUrl: "https://www.npmjs.com/package/react-native-bureauid-fraud-sdk",
         pins: [
-          {
-            label: "iOS BureauSMV",
-            file: "sample-native-module.podspec",
-            regex: /s\.dependency\s+["']BureauSMV["']\s*,\s*["']([^"']+)["']/,
-            latestFrom: "otl-ios",
-          },
-          {
-            label: "Android id.bureau:otl",
-            file: "android/build.gradle",
-            regex: /id\.bureau:otl:([^"']+)["']/,
-            latestFrom: "otl-android",
-          },
+          iosDep("BureauSMV", "otl-ios", "sample-native-module.podspec"),
+          androidDep("id.bureau:otl", "otl-android"),
         ],
       },
       {
@@ -274,23 +227,10 @@ const SECTIONS = [
         platform: "Flutter",
         name: "onetaplogin",
         fetcher: pubPackage("onetaplogin"),
-        sourceLabel: "pub.dev",
-        sourceUrl: "https://pub.dev/packages/onetaplogin",
         pinsSource: "pub",
         pins: [
-          {
-            label: "iOS BureauSMV",
-            file: "ios/onetaplogin.podspec",
-            regex: /s\.dependency\s+["']BureauSMV["']\s*,\s*["']([^"']+)["']/,
-            latestFrom: "otl-ios",
-            missingText: "not pinned (latest on install)",
-          },
-          {
-            label: "Android id.bureau:otl",
-            file: "android/build.gradle",
-            regex: /id\.bureau:otl:([^"']+)["']/,
-            latestFrom: "otl-android",
-          },
+          iosDep("BureauSMV", "otl-ios", "ios/onetaplogin.podspec", NOT_PINNED),
+          androidDep("id.bureau:otl", "otl-android"),
         ],
       },
     ],
@@ -303,8 +243,6 @@ const SECTIONS = [
         platform: "iOS",
         name: "Faceguard",
         fetcher: githubLatestRelease("Bureau-Inc/faceguard-ios"),
-        sourceLabel: "GitHub Releases",
-        sourceUrl: "https://github.com/Bureau-Inc/faceguard-ios/releases",
         pod: { name: "Faceguard", shard: "a_c_a" },
       },
       {
@@ -312,40 +250,60 @@ const SECTIONS = [
         platform: "Android",
         name: "id.bureau:livenesscheck",
         fetcher: bureauMaven("id/bureau/livenesscheck"),
-        sourceLabel: "packages.bureau.id (Maven)",
-        sourceUrl: "https://packages.bureau.id/Bureau/-/packages/maven/id.bureau-livenesscheck",
       },
       {
         id: "fg-rn",
         platform: "React Native",
         name: "react-native-face-guard-sdk",
         fetcher: npmPackage("react-native-face-guard-sdk"),
-        sourceLabel: "npm registry",
-        sourceUrl: "https://www.npmjs.com/package/react-native-face-guard-sdk",
         pins: [
-          {
-            label: "iOS Faceguard",
-            file: "react-native-face-guard-sdk.podspec",
-            regex: /s\.dependency\s+["']Faceguard["']\s*,\s*["']([^"']+)["']/,
-            latestFrom: "fg-ios",
-            missingText: "not pinned (latest on install)",
-          },
-          {
-            label: "Android id.bureau:livenesscheck",
-            file: "android/build.gradle",
-            regex: /id\.bureau:livenesscheck:([^"']+)["']/,
-            latestFrom: "fg-android",
-          },
+          iosDep("Faceguard", "fg-ios", "react-native-face-guard-sdk.podspec", NOT_PINNED),
+          androidDep("id.bureau:livenesscheck", "fg-android"),
         ],
       },
     ],
   },
 ];
 
+/* ---- pin builders: describe a native dependency pinned inside a wrapper package ---- */
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// A CocoaPods dependency declared in a wrapper package's podspec.
+function iosDep(name, latestFrom, file, extra) {
+  return {
+    label: `iOS ${name}`,
+    file,
+    regex: new RegExp(`s\\.dependency\\s+["']${escapeRe(name)}["']\\s*,\\s*["']([^"']+)["']`),
+    latestFrom,
+    ...extra,
+  };
+}
+
+// A Maven dependency declared in a wrapper package's android/build.gradle.
+function androidDep(coord, latestFrom) {
+  return {
+    label: `Android ${coord}`,
+    file: "android/build.gradle",
+    regex: new RegExp(`${escapeRe(coord)}:([^"']+)["']`),
+    latestFrom,
+  };
+}
+
 /* ---- fetchers: each returns { version, date, url } ---- */
 
+// Each factory returns the fetch function and tags it with the source label and
+// URL, so the SDK config never has to repeat what is already implied by the source.
+function withSource(fn, label, url) {
+  fn.sourceLabel = label;
+  fn.sourceUrl = url;
+  return fn;
+}
+
 function githubLatestRelease(repo) {
-  return async () => {
+  return withSource(async () => {
     const r = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
       headers: { Accept: "application/vnd.github+json" },
     });
@@ -357,11 +315,11 @@ function githubLatestRelease(repo) {
       date: j.published_at,
       url: j.html_url,
     };
-  };
+  }, "GitHub Releases", `https://github.com/${repo}/releases`);
 }
 
 function npmPackage(pkg) {
-  return async () => {
+  return withSource(async () => {
     const r = await fetch(`https://registry.npmjs.org/${pkg}`);
     if (!r.ok) throw new Error(`npm registry ${r.status}`);
     const j = await r.json();
@@ -372,11 +330,11 @@ function npmPackage(pkg) {
       date: j.time && j.time[v],
       url: `https://www.npmjs.com/package/${pkg}/v/${v}`,
     };
-  };
+  }, "npm registry", `https://www.npmjs.com/package/${pkg}`);
 }
 
 function pubPackage(pkg) {
-  return async () => {
+  return withSource(async () => {
     const r = await fetch(`https://pub.dev/api/packages/${pkg}`);
     if (!r.ok) throw new Error(`pub.dev ${r.status}`);
     const j = await r.json();
@@ -388,15 +346,16 @@ function pubPackage(pkg) {
       url: `https://pub.dev/packages/${pkg}/versions/${l.version}`,
       archiveUrl: l.archive_url,
     };
-  };
+  }, "pub.dev", `https://pub.dev/packages/${pkg}`);
 }
 
 function bureauMaven(artifactPath) {
   const metaUrl = `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/maven-metadata.xml`;
   const parts = artifactPath.split("/");
   const artifact = parts.pop();
-  const uiUrl = `https://packages.bureau.id/Bureau/-/packages/maven/${parts.join(".")}-${artifact}/versions`;
-  return async () => {
+  const uiBase = `https://packages.bureau.id/Bureau/-/packages/maven/${parts.join(".")}-${artifact}`;
+  const uiUrl = `${uiBase}/versions`;
+  return withSource(async () => {
     try {
       const r = await fetch(metaUrl);
       if (!r.ok) throw new Error(`maven ${r.status}`);
@@ -434,7 +393,7 @@ function bureauMaven(artifactPath) {
         throw new Error("cannot be read from the browser; use the Source link below to view versions");
       }
     }
-  };
+  }, "packages.bureau.id (Maven)", uiBase);
 }
 
 function semverCompare(a, b) {
@@ -616,7 +575,7 @@ function renderShell() {
           <div class="date"></div>
           ${s.pod ? '<div class="pins pod-block" hidden></div>' : ""}
           ${s.pins ? '<div class="pins" hidden></div>' : ""}
-          <div class="src">Source: <a href="${esc(s.sourceUrl)}" target="_blank" rel="noopener">${esc(s.sourceLabel)}</a></div>
+          <div class="src">Source: <a href="${esc(s.fetcher.sourceUrl)}" target="_blank" rel="noopener">${esc(s.fetcher.sourceLabel)}</a></div>
         </div>`
         )
         .join("")}
