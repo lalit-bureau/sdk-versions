@@ -30,7 +30,7 @@ jobs:
       - name: Fetch latest versions from Bureau Maven
         run: |
           set -euo pipefail
-          ARTIFACTS="id/bureau/otl id/bureau/livenesscheck"
+          ARTIFACTS="id/bureau/otl id/bureau/livenesscheck id/bureau/device-intelligence"
           BASE="https://packages.bureau.id/api/packages/Bureau/maven"
           entries='{}'
           for a in $ARTIFACTS; do
