@@ -171,7 +171,7 @@ const SECTIONS = [
         id: "di-android",
         platform: "Android",
         name: "id.bureau:device-intelligence",
-        fetcher: bureauMaven("id/bureau/device-intelligence"),
+        fetcher: bureauMaven("id/bureau/device-intelligence", { select: "highest" }),
       },
       {
         id: "di-rn",
@@ -193,6 +193,24 @@ const SECTIONS = [
           iosDep("bureau-id-fraud-sdk", "di-ios", "ios/flutter_bureau_device_intelligence.podspec"),
           androidDep("id.bureau:device-intelligence", "di-android"),
         ],
+      },
+    ],
+  },
+  {
+    title: "Device Intelligence (Custom build)",
+    sdks: [
+      {
+        id: "di-custom-ios",
+        platform: "iOS",
+        name: "BureauSDKiOS",
+        fetcher: githubLatestRelease("Bureau-Inc/BureauSDKiOS"),
+        pod: { name: "BureauSDKiOS", shard: "2_4_2" },
+      },
+      {
+        id: "di-custom-android",
+        platform: "Android",
+        name: "id.bureau:device-intelligence (1.x)",
+        fetcher: bureauMaven("id/bureau/device-intelligence", { snapshotKey: "id/bureau/device-intelligence@1", select: "v1" }),
       },
     ],
   },
@@ -349,13 +367,48 @@ function pubPackage(pkg) {
   }, "pub.dev", `https://pub.dev/packages/${pkg}`);
 }
 
-function bureauMaven(artifactPath) {
+// opts.snapshotKey  reads a specific snapshot entry (two cards can share one artifact).
+// opts.select       "latest" (default) trusts the live <latest> tag; "highest" or "v1"
+//                   need the full version list, which the live tag does not give, so
+//                   those read the value the scheduled workflow resolved into the snapshot.
+function bureauMaven(artifactPath, opts) {
+  const snapshotKey = (opts && opts.snapshotKey) || artifactPath;
+  const select = (opts && opts.select) || "latest";
   const metaUrl = `https://packages.bureau.id/api/packages/Bureau/maven/${artifactPath}/maven-metadata.xml`;
   const parts = artifactPath.split("/");
   const artifact = parts.pop();
   const uiBase = `https://packages.bureau.id/Bureau/-/packages/maven/${parts.join(".")}-${artifact}`;
   const uiUrl = `${uiBase}/versions`;
+
+  // The snapshot a scheduled workflow commits next to this page. It is also the
+  // fallback when the browser cannot read packages.bureau.id (no CORS headers).
+  const fromSnapshot = async () => {
+    const r = await fetch("versions-android.json", { cache: "no-store" });
+    if (!r.ok) throw 0;
+    const j = await r.json();
+    const entry = j.artifacts && j.artifacts[snapshotKey];
+    if (!entry || !entry.version) throw 0;
+    let note = null;
+    const checked = j.checked_at ? new Date(j.checked_at).getTime() : NaN;
+    const ageHours = (Date.now() - checked) / 3600000;
+    if (isFinite(ageHours) && ageHours > 6) {
+      note = `last verified ${Math.round(ageHours)} hours ago`;
+      track("snapshot_stale", { artifact: snapshotKey, age_hours: Math.round(ageHours) });
+    }
+    return { version: entry.version, date: entry.date || null, url: uiUrl, note };
+  };
+  const snapshotOrThrow = async () => {
+    try {
+      return await fromSnapshot();
+    } catch (e) {
+      throw new Error("cannot be read from the browser; use the Source link below to view versions");
+    }
+  };
+
   return withSource(async () => {
+    // "highest"/"v1" depend on the whole version list; the live <latest> tag is only
+    // the last upload, so it cannot answer them. Trust the workflow-resolved snapshot.
+    if (select !== "latest") return snapshotOrThrow();
     try {
       const r = await fetch(metaUrl);
       if (!r.ok) throw new Error(`maven ${r.status}`);
@@ -373,25 +426,7 @@ function bureauMaven(artifactPath) {
       } catch (e) {}
       return { version, date, url: uiUrl };
     } catch (liveError) {
-      // Browsers cannot read packages.bureau.id (no CORS headers); fall back to
-      // the snapshot a scheduled workflow commits next to this page.
-      try {
-        const r = await fetch("versions-android.json", { cache: "no-store" });
-        if (!r.ok) throw 0;
-        const j = await r.json();
-        const entry = j.artifacts && j.artifacts[artifactPath];
-        if (!entry || !entry.version) throw 0;
-        let note = null;
-        const checked = j.checked_at ? new Date(j.checked_at).getTime() : NaN;
-        const ageHours = (Date.now() - checked) / 3600000;
-        if (isFinite(ageHours) && ageHours > 6) {
-          note = `last verified ${Math.round(ageHours)} hours ago`;
-          track("snapshot_stale", { artifact: artifactPath, age_hours: Math.round(ageHours) });
-        }
-        return { version: entry.version, date: entry.date || null, url: uiUrl, note };
-      } catch (e) {
-        throw new Error("cannot be read from the browser; use the Source link below to view versions");
-      }
+      return snapshotOrThrow();
     }
   }, "packages.bureau.id (Maven)", uiBase);
 }

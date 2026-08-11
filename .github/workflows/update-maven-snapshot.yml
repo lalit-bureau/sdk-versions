@@ -30,19 +30,38 @@ jobs:
       - name: Fetch latest versions from Bureau Maven
         run: |
           set -euo pipefail
-          ARTIFACTS="id/bureau/otl id/bureau/livenesscheck id/bureau/device-intelligence"
           BASE="https://packages.bureau.id/api/packages/Bureau/maven"
+          # Each job is "<maven-path>|<snapshot-key>|<selector>". One artifact can
+          # produce several keys (device-intelligence ships two parallel lines).
+          #   latest  = the <latest>/<release> tag as published
+          #   highest = the highest stable X.Y.Z version
+          #   v1      = the newest version on the 1.x line (pre-releases included)
           entries='{}'
-          for a in $ARTIFACTS; do
-            xml=$(curl -fsS --max-time 60 "$BASE/$a/maven-metadata.xml")
-            v=$(echo "$xml" | grep -oE '<latest>[^<]+</latest>' | sed -E 's|</?latest>||g' || true)
-            if [ -z "$v" ]; then
-              v=$(echo "$xml" | grep -oE '<release>[^<]+</release>' | sed -E 's|</?release>||g')
-            fi
-            name=$(basename "$a")
-            lm=$(curl -fsSI --max-time 60 "$BASE/$a/$v/$name-$v.pom" | grep -i '^last-modified:' | sed -E 's/^[Ll]ast-[Mm]odified:[[:space:]]*//' | tr -d '\r' || true)
-            entries=$(echo "$entries" | jq --arg k "$a" --arg v "$v" --arg d "$lm" '. + {($k): {version: $v, date: $d}}')
-          done
+          while IFS='|' read -r path key mode; do
+            [ -z "$path" ] && continue
+            xml=$(curl -fsS --max-time 60 "$BASE/$path/maven-metadata.xml")
+            vers=$(echo "$xml" | grep -oE '<version>[^<]+</version>' | sed -E 's|</?version>||g')
+            case "$mode" in
+              latest)
+                v=$(echo "$xml" | grep -oE '<latest>[^<]+</latest>' | sed -E 's|</?latest>||g' || true)
+                [ -z "$v" ] && v=$(echo "$xml" | grep -oE '<release>[^<]+</release>' | sed -E 's|</?release>||g' || true)
+                ;;
+              highest)
+                v=$(echo "$vers" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+                ;;
+              v1)
+                v=$(echo "$vers" | grep -E '^1\.' | sort -V | tail -1 || true)
+                ;;
+            esac
+            [ -z "$v" ] && { echo "no version resolved for $path ($mode)"; exit 1; }
+            name=$(basename "$path")
+            lm=$(curl -fsSI --max-time 60 "$BASE/$path/$v/$name-$v.pom" | grep -i '^last-modified:' | sed -E 's/^[Ll]ast-[Mm]odified:[[:space:]]*//' | tr -d '\r' || true)
+            entries=$(echo "$entries" | jq --arg k "$key" --arg v "$v" --arg d "$lm" '. + {($k): {version: $v, date: $d}}')
+          done < <(printf '%s\n' \
+            "id/bureau/otl|id/bureau/otl|latest" \
+            "id/bureau/livenesscheck|id/bureau/livenesscheck|latest" \
+            "id/bureau/device-intelligence|id/bureau/device-intelligence|highest" \
+            "id/bureau/device-intelligence|id/bureau/device-intelligence@1|v1")
           jq -n --argjson artifacts "$entries" --arg t "$(date -u +%FT%TZ)" \
             '{checked_at: $t, artifacts: $artifacts}' > versions-android.json.new
           cat versions-android.json.new
