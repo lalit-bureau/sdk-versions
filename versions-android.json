@@ -1,13 +1,13 @@
 {
-  "checked_at": "2026-09-23T11:40:23Z",
+  "checked_at": "2026-10-02T12:39:02Z",
   "artifacts": {
     "id/bureau/otl": {
       "version": "5.1.1",
       "date": "Wed, 23 Sep 2026 10:29:02 GMT"
     },
     "id/bureau/livenesscheck": {
-      "version": "2.1.0",
-      "date": "Wed, 09 Sep 2026 13:43:13 GMT"
+      "version": "2.1.1-alpha01",
+      "date": "Fri, 02 Oct 2026 10:55:53 GMT"
     },
     "id/bureau/device-intelligence": {
       "version": "5.3.2",
